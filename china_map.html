@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <div id="map-id" style="display: none;">map</div>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_1847de95be0bd1ebe87a3dd0366aead5 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+            <!-- 添加自定义CSS和JavaScript来实现界面增强 -->
+            <style>
+                /* 左侧悬浮窗样式 */
+                #progress-panel {
+                    position: fixed;
+                    left: 20px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    width: 150px;
+                    background: rgba(255, 255, 255, 0.95);
+                    border-radius: 8px;
+                    padding: 15px;
+                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                    z-index: 1000;
+                    font-family: 'Microsoft YaHei', Arial, sans-serif;
+                }
+                
+                #progress-panel h3 {
+                    margin-top: 0;
+                    margin-bottom: 10px;
+                    font-size: 16px;
+                    color: #d32f2f;
+                    text-align: center;
+                }
+                
+                #progress-info {
+                    margin-bottom: 15px;
+                    text-align: center;
+                }
+                
+                #progress-bar {
+                    width: 100%;
+                    height: 8px;
+                    background: #e0e0e0;
+                    border-radius: 4px;
+                    margin: 10px 0;
+                    overflow: hidden;
+                }
+                
+                #progress-fill {
+                    height: 100%;
+                    background: #d32f2f;
+                    width: 0%;
+                    transition: width 0.3s ease;
+                }
+                
+                .control-btn {
+                    width: 100%;
+                    padding: 8px;
+                    margin: 5px 0;
+                    background: #d32f2f;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                
+                .control-btn:hover {
+                    background: #b71c1c;
+                }
+                
+                /* 顶部标志样式 */
+                #header-banner {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 60px;
+                    background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                    z-index: 1001;
+                    font-family: 'Microsoft YaHei', Arial, sans-serif;
+                }
+                
+                #header-banner h1 {
+                    margin: 0;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+                
+                /* 右侧详情页样式 */
+                #details-panel {
+                    position: fixed;
+                    right: -400px;
+                    top: 60px;
+                    bottom: 0;
+                    width: 400px;
+                    background: rgba(255, 255, 255, 0.95);
+                    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+                    z-index: 1000;
+                    transition: right 0.3s ease;
+                    padding: 20px;
+                    overflow-y: auto;
+                    font-family: 'Microsoft YaHei', Arial, sans-serif;
+                }
+                
+                #details-panel.show {
+                    right: 0;
+                }
+                
+                #details-panel h2 {
+                    margin-top: 0;
+                    color: #d32f2f;
+                    font-size: 20px;
+                }
+                
+                #details-panel h3 {
+                    color: #757575;
+                    font-size: 16px;
+                    margin-top: 5px;
+                }
+                
+                .detail-section {
+                    margin-bottom: 20px;
+                }
+                
+                .detail-section h4 {
+                    color: #333;
+                    font-size: 14px;
+                    margin-bottom: 8px;
+                    padding-bottom: 5px;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+                
+                .detail-section p {
+                    line-height: 1.6;
+                    color: #555;
+                    margin: 0;
+                }
+                
+                .close-btn {
+                    position: fixed;
+                    bottom: 20px;
+                    left: 20px;
+                    background: white;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    width: 30px;
+                    height: 30px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1002;
+                    color: #333;
+                    font-size: 20px;
+                    line-height: 1;
+                    padding: 0;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                }
+                
+                .close-btn:hover {
+                    opacity: 0.8;
+                }
+                
+                /* 确保地图容器有足够的空间显示所有内容 */
+                .map-container {
+                    position: relative;
+                    width: 100%;
+                    height: 100vh;
+                }
+                
+                /* 音效控制样式 */
+                #audio-control {
+                    margin-top: 15px;
+                    padding-top: 15px;
+                    border-top: 1px solid #e0e0e0;
+                }
+                
+                #audio-btn {
+                    width: 100%;
+                    padding: 8px;
+                    background: #2196f3;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                
+                #audio-btn:hover {
+                    background: #1976d2;
+                }
+                
+                /* 地图图例样式 */
+                .legend {
+                    background: white;
+                    padding: 10px;
+                    border-radius: 8px;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                    font-size: 12px;
+                    line-height: 1.5;
+                }
+                
+                .legend i {
+                    width: 15px;
+                    height: 15px;
+                    float: left;
+                    margin-right: 8px;
+                    opacity: 0.8;
+                }
+            </style>
+        </head>
+<body>
+    <!-- 顶部标志 -->
+    <div id="header-banner">
+        <h1>红军长征路线图</h1>
+    </div>
+    
+    <!-- 左侧悬浮窗 -->
+    <div id="progress-panel">
+        <h3>长征进度</h3>
+        <div id="progress-info">
+            <div>已完成: <span id="progress-text">0%</span></div>
+            <div id="progress-bar">
+                <div id="progress-fill"></div>
+            </div>
+        </div>
+        <button class="control-btn" onclick="prevNode()">上一站</button>
+        <button class="control-btn" onclick="nextNode()">下一站</button>
+        <button class="control-btn" onclick="resetMap()">重置地图</button>
+        
+        <!-- 音效控制 -->
+        <div id="audio-control">
+            <button id="audio-btn" onclick="toggleAudio()">播放背景音乐</button>
+        </div>
+    </div>
+    
+    <!-- 右侧详情面板 -->
+    <div id="details-panel">
+        <h2 id="detail-title">站点详情</h2>
+        <h3 id="detail-description"></h3>
+        
+        <div class="detail-section">
+            <h4>地点介绍</h4>
+            <p id="detail-introduction"></p>
+        </div>
+        
+        <div class="detail-section">
+            <h4>主要事件</h4>
+            <p id="detail-events"></p>
+        </div>
+        
+        <div class="detail-section">
+            <h4>历史故事</h4>
+            <p id="detail-story"></p>
+        </div>
+        
+        <div class="detail-section">
+            <img id="detail-image" src="" alt="历史图片" style="width: 100%; border-radius: 4px; margin-top: 10px;">
+        </div>
+    </div>
+    
+    <!-- 关闭按钮 -->
+    <button class="close-btn" onclick="closeDetails()">×</button>
+    
+    <!-- 地图容器 -->
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+    
+    <script>
+        // 创建地图实例
+        var map = L.map('map').setView([25.8856, 116.0270], 8);
+        
+        // 添加基础图层
+        var tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // 长征路线节点数据
+        var longMarchWaypoints = [
+            {
+                name: '瑞金',
+                location: [25.8856, 116.0270],
+                description: '长征出发地',
+                introduction: '瑞金是中华苏维埃共和国临时中央政府所在地，被誉为红色故都、共和国摇篮。',
+                events: '1934年10月10日，中共中央、中革军委率中央红军主力从瑞金等地出发，开始长征。',
+                story: '1934年10月，由于第五次反"围剿"失败，中央红军被迫实行战略性转移。在瑞金，红军进行了充分的准备，包括人员、物资的集结和政治动员。红军将士们怀着对革命事业的坚定信念，踏上了艰苦卓绝的长征之路。',
+                image: 'https://pic.rmb.bdstatic.com/bjh/news/e3b61520c2e4f516b1c4651f4691815d.jpeg'
+            },
+            {
+                name: '雩都',
+                location: [25.9811, 115.4442],
+                description: '于都河渡河',
+                introduction: '雩都（今于都）是中央红军长征的第一渡，是红军离开中央苏区的最后一站。',
+                events: '1934年10月16日至19日，中央红军主力8.6万余人从于都河的8个渡口渡河，开始了著名的二万五千里长征。',
+                story: '在于都，当地群众积极支持红军，他们不仅提供了大量的船只，还帮助红军搭建浮桥。许多群众自发为红军战士送茶送水，甚至把自己的口粮拿出来支援红军。在群众的帮助下，红军成功渡过了于都河，开始了艰苦的长征历程。',
+                image: 'https://img.zcool.cn/community/01b4d45d383265a8012193a3696d2e.jpg@1280w_1l_2o_100sh.jpg'
+            },
+            {
+                name: '遵义',
+                location: [27.7172, 106.9271],
+                description: '遵义会议召开地',
+                introduction: '遵义是中国革命历史上的重要转折点，遵义会议确立了毛泽东在党中央和红军的领导地位。',
+                events: '1935年1月15日至17日，中共中央在遵义召开政治局扩大会议，确立了毛泽东在党中央和红军的领导地位。',
+                story: '遵义会议是中国共产党历史上一个生死攸关的转折点。会议集中解决了当时具有决定意义的军事和组织问题，结束了王明"左"倾教条主义在党中央的统治，确立了毛泽东在党中央和红军的领导地位。这次会议挽救了党、挽救了红军、挽救了中国革命，是党的历史上一个伟大的转折点。',
+                image: 'https://pic.rmb.bdstatic.com/bjh/news/b3bd8b8d9bceb918e1421e11b91a8d83.jpeg'
+            },
+            {
+                name: '赤水',
+                location: [28.5081, 105.7975],
+                description: '四渡赤水',
+                introduction: '赤水是红军长征中著名的四渡赤水战役发生地，是毛泽东军事指挥艺术的得意之笔。',
+                events: '1935年1月19日至3月22日，中央红军在毛泽东等指挥下，四渡赤水，巧妙地跳出了国民党军的包围圈。',
+                story: '四渡赤水战役是红军长征中最精彩的军事行动之一，也是毛泽东军事指挥艺术的得意之笔。在毛泽东的指挥下，红军采取灵活机动的战略战术，声东击西，迷惑敌人，成功地摆脱了国民党军的围追堵截，实现了战略转移的目标。',
+                image: 'https://img.zcool.cn/community/01f02858a471e7a801219c77d2e322.jpg@1280w_1l_2o_100sh.jpg'
+            },
+            {
+                name: '金沙江',
+                location: [27.1564, 100.2562],
+                description: '巧渡金沙江',
+                introduction: '金沙江是长江的上游，水流湍急，是红军长征中的一道天险。',
+                events: '1935年5月3日至9日，中央红军干部团在后有追兵的情况下，仅凭7只小船，用6天6夜时间巧渡金沙江。',
+                story: '金沙江战役是红军长征中的一次重要战役。红军先头部队化装成国民党军，智取了皎平渡，并控制了渡口。当地群众帮助红军仅用7只小船，在6天6夜时间里，将中央红军主力全部渡过了金沙江，成功地摆脱了国民党军的围追堵截。',
+                image: 'https://pic.rmb.bdstatic.com/bjh/news/a6a3b39b0bbd5f2f1ce3d1b1f8e28d8e.jpeg'
+            },
+            {
+                name: '大渡河',
+                location: [29.4333, 102.2167],
+                description: '强渡大渡河',
+                introduction: '大渡河是红军长征中的又一道天险，水流湍急，两岸悬崖峭壁。',
+                events: '1935年5月24日至25日，中央红军在安顺场强渡大渡河，十八勇士冒着敌人的枪林弹雨，成功突破天险。',
+                story: '强渡大渡河是红军长征中的一次勇敢壮举。在敌人的严密防守下，红军十八勇士在火力掩护下，乘坐木船强行渡河，成功地突破了敌人的防线。这次战役展现了红军战士不怕牺牲、英勇无畏的革命精神。',
+                image: 'https://pic.rmb.bdstatic.com/bjh/news/a40e6c959663850777e278d9cf295be2.jpeg'
+            },
+            {
+                name: '泸定桥',
+                location: [29.9428, 102.2956],
+                description: '飞夺泸定桥',
+                introduction: '泸定桥是一座铁索桥，横跨大渡河，是红军长征中的关键节点。',
+                events: '1935年5月29日，22名红军战士在火力掩护下，攀着铁索向对岸冲锋，最终夺下泸定桥。',
+                story: '飞夺泸定桥是红军长征中最惊险、最悲壮的战役之一。在敌人拆除了桥上的木板，只剩下13根铁索的情况下，22名红军战士手持冲锋枪，身背马刀，腰缠手榴弹，冒着敌人的枪林弹雨，攀着铁索向对岸冲锋。最终，红军成功地夺下了泸定桥，为中央红军北上打开了通道。',
+                image: 'https://pic.rmb.bdstatic.com/bjh/news/35e4fbd5b33c4307160c507a8133afb1.jpeg'
+            },
+            {
+                name: '夹金山',
+                location: [30.6853, 102.8677],
+                description: '翻越夹金山',
+                introduction: '夹金山是红军长征中翻越的第一座大雪山，海拔4000多米，山上终年积雪，空气稀薄。',
+                events: '1935年6月12日，中央红军先头部队翻越长征途中第一座大雪山——夹金山，山上终年积雪，空气稀薄。',
+                story: '翻越夹金山是红军长征中的一次艰苦卓绝的考验。山上终年积雪，空气稀薄，气温极低，许多红军战士因为严寒、缺氧而牺牲。但红军战士们发扬了不怕苦、不怕死的革命精神，互相帮助，互相鼓励，最终成功地翻越了夹金山。',
+                image: 'https://img.zcool.cn/community/01611d58a471e9a801219c77557881.jpg@1280w_1l_2o_100sh.jpg'
+            },
+            {
+                name: '懋功',
+                location: [31.5543, 102.4531],
+                description: '与红四方面军会师',
+                introduction: '懋功是中央红军与红四方面军会师的地点，标志着红军力量的壮大。',
+                events: '1935年6月18日，中央红军与红四方面军在懋功会师，两军将士欢欣鼓舞，庆祝胜利会师。',
+                story: '懋功会师是红军长征中的一个重要里程碑。中央红军与红四方面军的胜利会师，壮大了红军的力量，增强了红军的信心。两军将士互相学习，互相帮助，结下了深深的革命友谊。',
+                image: 'https://img.zcool.cn/community/015c5558a471e8a801219c779f01fc.jpg@1280w_1l_2o_100sh.jpg'
+            },
+            {
+                name: '松潘草地',
+                location: [32.6000, 103.8000],
+                description: '过草地',
+                introduction: '松潘草地是红军长征中最艰苦的路段之一，到处是沼泽泥潭，一不小心就会陷进去。',
+                events: '1935年8月21日至26日，中央红军过松潘草地，草地茫茫无边，到处是沼泽泥潭，不少红军战士陷入泥潭牺牲。',
+                story: '过草地是红军长征中最艰苦的历程之一。草地茫茫无边，到处是沼泽泥潭，一不小心就会陷进去，而且没有食物，没有水，许多红军战士因为饥饿、寒冷、疾病而牺牲。但红军战士们发扬了革命乐观主义精神，互相帮助，互相鼓励，最终成功地走出了草地。',
+                image: 'https://pic.rmb.bdstatic.com/bjh/news/ce287241f06b1665e6b1fc778a7fb59d.jpeg'
+            },
+            {
+                name: '吴起镇',
+                location: [36.92785, 108.17611],
+                description: '长征终点',
+                introduction: '吴起镇是中央红军长征的终点，标志着长征的胜利结束。',
+                events: '1935年10月19日，中央红军到达陕北吴起镇，与陕北红军会师，胜利完成了二万五千里长征。',
+                story: '吴起镇会师是红军长征胜利的标志。经过一年多的艰苦跋涉，中央红军终于到达了陕北，与陕北红军胜利会师。长征的胜利，保存了党和红军的基干力量，打开了中国革命的新局面。',
+                image: 'https://pic.rmb.bdstatic.com/bjh/news/18afdc74229304940c6cf7756957d376.jpeg'
+            }
+        ];
+        
+        // 增强版长征路线坐标
+        var enhancedMarchCoordinates = [
+            // 瑞金到雩都段
+            [25.8856, 116.0270],  // 瑞金
+            [25.9250, 115.8700],  // 于都河渡口附近
+            [25.9811, 115.4442],  // 雩都
+            
+            // 雩都到遵义段
+            [25.9000, 114.9000],  // 向湘江方向
+            [25.6000, 113.9000],  // 湘江战役附近
+            [26.0000, 113.0000],  // 贵州边界
+            [26.5000, 111.8000],  // 贵州境内
+            [27.1000, 109.8000],  // 接近遵义
+            [27.7172, 106.9271],  // 遵义
+            
+            // 遵义到赤水段
+            [27.8000, 106.5000],  // 遵义附近
+            [28.0000, 106.2000],  // 四渡赤水路线点1
+            [28.2000, 105.9000],  // 四渡赤水路线点2
+            [28.4000, 105.8000],  // 四渡赤水路线点3
+            [28.5081, 105.7975],  // 赤水
+            
+            // 赤水到金沙江段
+            [28.3000, 105.2000],  // 向金沙江方向
+            [27.9000, 104.5000],  // 云南境内
+            [27.5000, 103.2000],  // 接近金沙江
+            [27.1564, 100.2562],  // 金沙江
+            
+            // 金沙江到大渡河段
+            [27.5000, 100.0000],  // 继续北上
+            [28.0000, 101.0000],  // 四川境内
+            [28.8000, 101.8000],  // 接近大渡河
+            [29.4333, 102.2167],  // 大渡河
+            
+            // 大渡河到泸定桥段
+            [29.6000, 102.2500],  // 向泸定桥方向
+            [29.9428, 102.2956],  // 泸定桥
+            
+            // 泸定桥到懋功段（简化，不再显示具体雪山位置）
+            [30.1000, 102.4000],  // 向西北方向
+            [30.5000, 102.6000],  // 继续北上
+            [31.0000, 102.5000],  // 继续北上
+            [31.3000, 102.4500],  // 接近懋功
+            [31.5543, 102.4531],  // 懋功（与红四方面军会师）
+            
+            // 懋功到吴起镇段（简化松潘草地路线）
+            [31.8000, 102.8000],  // 向松潘草地方向
+            [32.0000, 103.0000],  // 松潘草地附近
+            [32.3000, 103.4000],  // 松潘草地北部
+            [32.6047, 103.6553],  // 松潘草地（更精确的坐标）
+            [33.0000, 104.0000],  // 离开草地
+            [33.5000, 104.5000],  // 甘肃境内
+            [34.0000, 105.0000],  // 继续北上
+            [34.5000, 105.5000],  // 陕西边界
+            [35.0000, 106.0000],  // 陕西境内
+            [35.5000, 106.5000],  // 接近吴起镇
+            [36.0000, 107.0000],  // 继续向吴起镇
+            [36.5000, 107.5000],  // 陕北境内
+            [36.92785, 108.17611]  // 吴起镇（长征终点）
+        ];
+        
+        // 绘制红军长征路线
+        var longMarchPath = L.polyline(
+            enhancedMarchCoordinates,
+            {
+                color: '#FFB6C1',  // 粉色
+                weight: 4,
+                opacity: 0.9,
+                tooltip: '红军长征真实路线',
+                popup: '红军长征（1934-1935）：从瑞金到吴起镇，翻雪山过草地的真实路径'
+            }
+        ).addTo(map);
+        
+        // 创建节点标记和信息
+        var markers = [];
+        var currentNodeIndex = -1;
+        
+        for (var i = 0; i < longMarchWaypoints.length; i++) {
+            var waypoint = longMarchWaypoints[i];
+            
+            // 创建自定义HTML标记
+            var markerHtml = `
+            <div style="text-align: center;">
+                <div style="
+                    position: relative;
+                    width: 40px;
+                    height: 40px;
+                    margin: 0 auto;
+                ">
+                    <!-- 自定义图标 -->
+                    <div style="
+                        background-color: #d32f2f;
+                        color: white;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 24px;
+                        box-shadow: 0 0 10px rgba(211, 47, 47, 0.7);
+                    ">🏮</div>
+                    <!-- 右上角数字 -->
+                    <div style="
+                        position: absolute;
+                        top: -5px;
+                        right: -5px;
+                        background-color: #ffd700;
+                        color: #d32f2f;
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 12px;
+                        box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+                    ">${i+1}</div>
+                </div>
+            </div>`;
+            
+            // 创建自定义图标
+            var customIcon = L.divIcon({
+                html: markerHtml,
+                className: 'custom-div-icon',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            });
+            
+            // 创建标记
+            var marker = L.marker(waypoint.location, {
+                icon: customIcon,
+                title: `${i+1}. ${waypoint.name}`
+            }).addTo(map);
+            
+            // 绑定弹出信息
+            marker.bindPopup(`
+                <div style="font-size: 14px;">
+                    <strong>${waypoint.name}</strong><br>
+                    ${waypoint.description}<br>
+                    <button onclick="openDetailsForNode(${i})" 
+                            style="margin-top: 10px; padding: 5px 10px; 
+                                   background-color: #d32f2f; color: white; 
+                                   border: none; border-radius: 4px; cursor: pointer;">
+                        查看更多
+                    </button>
+                </div>
+            `, {
+                maxWidth: 300,
+                minWidth: 200
+            });
+            
+            markers.push(marker);
+        }
+        
+        // 全局函数：打开节点详情
+        window.openDetailsForNode = function(index) {
+            var node = longMarchWaypoints[index];
+            
+            // 更新详情面板内容
+            document.getElementById('detail-title').textContent = node.name;
+            document.getElementById('detail-description').textContent = node.description;
+            document.getElementById('detail-introduction').textContent = node.introduction;
+            document.getElementById('detail-events').textContent = node.events;
+            document.getElementById('detail-story').textContent = node.story;
+            document.getElementById('detail-image').src = node.image;
+            document.getElementById('detail-image').alt = node.name + '历史图片';
+            
+            // 显示详情面板
+            var detailsPanel = document.getElementById('details-panel');
+            detailsPanel.classList.add('show');
+            
+            // 更新当前节点索引
+            currentNodeIndex = index;
+            
+            // 更新进度条
+            updateProgress(index);
+            
+            // 移动地图到该节点
+            map.setView(node.location, 10);
+        };
+        
+        // 全局函数：关闭详情面板
+        window.closeDetails = function() {
+            var detailsPanel = document.getElementById('details-panel');
+            detailsPanel.classList.remove('show');
+        };
+        
+        // 全局函数：上一站
+        window.prevNode = function() {
+            if (currentNodeIndex > 0) {
+                openDetailsForNode(currentNodeIndex - 1);
+            } else if (currentNodeIndex === 0) {
+                // 如果是第一个节点，则跳到最后一个节点
+                openDetailsForNode(longMarchWaypoints.length - 1);
+            } else {
+                // 如果没有选中节点，则从第一个开始
+                openDetailsForNode(0);
+            }
+        };
+        
+        // 全局函数：下一站
+        window.nextNode = function() {
+            if (currentNodeIndex < longMarchWaypoints.length - 1) {
+                openDetailsForNode(currentNodeIndex + 1);
+            } else if (currentNodeIndex === longMarchWaypoints.length - 1) {
+                // 如果是最后一个节点，则跳到第一个节点
+                openDetailsForNode(0);
+            } else {
+                // 如果没有选中节点，则从第一个开始
+                openDetailsForNode(0);
+            }
+        };
+        
+        // 全局函数：重置地图
+        window.resetMap = function() {
+            map.setView([25.8856, 116.0270], 8);
+            currentNodeIndex = -1;
+            updateProgress(-1);
+            closeDetails();
+        };
+        
+        // 全局函数：切换背景音乐
+        window.toggleAudio = function() {
+            var audioBtn = document.getElementById('audio-btn');
+            
+            if (!window.audio) {
+                // 创建音频元素
+                window.audio = new Audio('https://assets.mixkit.co/music/preview/mixkit-revolutionary-music-box-649.mp3');
+                window.audio.loop = true;
+                
+                // 尝试播放
+                window.audio.play().then(function() {
+                    audioBtn.textContent = '暂停背景音乐';
+                }).catch(function(error) {
+                    console.log('无法自动播放音频:', error);
+                    alert('请手动点击播放音乐');
+                });
+            } else {
+                if (window.audio.paused) {
+                    window.audio.play();
+                    audioBtn.textContent = '暂停背景音乐';
+                } else {
+                    window.audio.pause();
+                    audioBtn.textContent = '播放背景音乐';
+                }
+            }
+        };
+        
+        // 更新进度条
+        function updateProgress(index) {
+            var progressText = document.getElementById('progress-text');
+            var progressFill = document.getElementById('progress-fill');
+            
+            if (index === -1) {
+                progressText.textContent = '0%';
+                progressFill.style.width = '0%';
+            } else {
+                var progress = Math.round(((index + 1) / longMarchWaypoints.length) * 100);
+                progressText.textContent = progress + '%';
+                progressFill.style.width = progress + '%';
+            }
+        }
+        
+        // 调整地图高度以适应移动设备
+        function adjustMapHeight() {
+            var headerHeight = document.getElementById('header-banner').offsetHeight;
+            var mapContainer = document.querySelector('.map-container');
+            
+            mapContainer.style.height = 'calc(100vh - ' + headerHeight + 'px)';
+        }
+        
+        // 初始化时调整地图高度
+        adjustMapHeight();
+        
+        // 监听窗口大小变化，调整地图高度
+        window.addEventListener('resize', adjustMapHeight);
+        
+        // 添加图层控制器
+        L.control.layers({
+            'OpenStreetMap': tileLayer,
+            '卫星图': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            })
+        }).addTo(map);
+        
+        // 添加比例尺
+        L.control.scale().addTo(map);
+        
+        // 添加地图图例
+        var legend = L.control({
+            position: 'bottomright'
+        });
+        
+        legend.onAdd = function(map) {
+            var div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <h4>图例</h4>
+                <i style="background: #FFB6C1; width: 20px; height: 3px;"></i> 红军长征路线<br>
+                <i style="background: #d32f2f; border-radius: 50%; width: 20px; height: 20px;"></i> 长征节点<br>
+            `;
+            return div;
+        };
+        
+        legend.addTo(map);
+    </script>
+</body>
+</html>
