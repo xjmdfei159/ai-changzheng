@@ -735,6 +735,807 @@
         };
         
         legend.addTo(map);
-    </script>
+    // 添加行走动画样式
+    addWalkingAnimation();
+    
+    // 为线段添加动画效果
+    setTimeout(animatePaths, 2000);
+    
+    // 添加可拖拽的小士兵
+    addSoldier();
+    
+    // 初始化进度
+    updateProgress(0);
+    
+    // 为地图上的标记添加点击事件
+    // 注意：这部分需要在地图完全加载后执行
+    setTimeout(function() {
+        const markers = document.querySelectorAll('.leaflet-marker-icon');
+        markers.forEach((marker, index) => {
+            marker.addEventListener('click', function(e) {
+                // 阻止事件冒泡，避免循环调用
+                e.stopPropagation();
+                updateProgress(index);
+                // 调用openDetails函数打开详情页
+                openDetails();
+                // 确保浮窗能正确弹出
+                if (marker._icon && marker._icon.parentNode && marker._icon.parentNode._popup) {
+                    marker._icon.parentNode.openPopup();
+                }
+            });
+        });
+    }, 1000);
+    
+    // 添加CSS样式使详情面板可见
+    setTimeout(function() {
+        const style = document.createElement('style');
+        style.textContent = `
+            #details-panel.show {
+                right: 0;
+            }
+            
+            /* 红军小人样式 */
+            #soldier {
+                position: absolute;
+                width: 40px;
+                height: 60px;
+                cursor: move;
+                z-index: 999;
+                transform-origin: center bottom;
+                pointer-events: all;
+            }
+            
+            #soldier.dragging {
+                opacity: 0.8;
+                transform: scale(1.1);
+            }
+            
+            /* 红军小人行走动画 */
+            @keyframes walk {
+                0%, 100% {
+                    transform: translateY(0) rotate(0deg);
+                }
+                25% {
+                    transform: translateY(-5px) rotate(-3deg);
+                }
+                50% {
+                    transform: translateY(0) rotate(3deg);
+                }
+                75% {
+                    transform: translateY(-5px) rotate(-2deg);
+                }
+            }
+            
+            #soldier.walking {
+                animation: walk 0.6s infinite ease-in-out;
+            }
+            
+            /* 红军小人组件 */
+            .soldier-body {
+                position: relative;
+                width: 40px;
+                height: 60px;
+            }
+            
+            .soldier-head {
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 24px;
+                height: 24px;
+                background-color: #f5d0c5;
+                border-radius: 50%;
+                border: 2px solid #000;
+            }
+            
+            .soldier-uniform {
+                position: absolute;
+                top: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 30px;
+                height: 20px;
+                background-color: #d32f2f;
+                border: 2px solid #000;
+            }
+            
+            .soldier-legs {
+                position: absolute;
+                top: 44px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 20px;
+                height: 16px;
+                display: flex;
+                justify-content: space-between;
+            }
+            
+            .soldier-left-leg,
+            .soldier-right-leg {
+                width: 6px;
+                height: 16px;
+                background-color: #212121;
+                border: 1px solid #000;
+                position: relative;
+            }
+            
+            .soldier-arms {
+                position: absolute;
+                top: 28px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 40px;
+                height: 8px;
+                display: flex;
+                justify-content: space-between;
+            }
+            
+            .soldier-left-arm,
+            .soldier-right-arm {
+                width: 12px;
+                height: 8px;
+                background-color: #d32f2f;
+                border: 1px solid #000;
+            }
+            
+            /* 行走时的手脚动画 */
+            #soldier.walking .soldier-left-leg {
+                animation: leg-move 0.6s infinite ease-in-out;
+            }
+            
+            #soldier.walking .soldier-right-leg {
+                animation: leg-move 0.6s infinite ease-in-out 0.3s;
+            }
+            
+            #soldier.walking .soldier-left-arm {
+                animation: arm-move 0.6s infinite ease-in-out 0.3s;
+            }
+            
+            #soldier.walking .soldier-right-arm {
+                animation: arm-move 0.6s infinite ease-in-out;
+            }
+            
+            @keyframes leg-move {
+                0%, 100% {
+                    transform: rotate(0deg);
+                }
+                50% {
+                    transform: rotate(-20deg);
+                }
+            }
+            
+            @keyframes arm-move {
+                0%, 100% {
+                    transform: rotate(0deg);
+                }
+                50% {
+                    transform: rotate(20deg);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }, 500);
+    
+    // 添加可拖拽的小人
+    function addSoldier() {
+        const soldier = document.createElement('div');
+        soldier.id = 'soldier';
+        
+        // 创建带有手和脚的小人HTML结构
+        soldier.innerHTML = `
+            <div class="soldier-body">
+                <div class="soldier-head"></div>
+                <div class="soldier-uniform"></div>
+                <div class="soldier-arms">
+                    <div class="soldier-left-arm"></div>
+                    <div class="soldier-right-arm"></div>
+                </div>
+                <div class="soldier-legs">
+                    <div class="soldier-left-leg"></div>
+                    <div class="soldier-right-leg"></div>
+                </div>
+            </div>
+        `;
+        
+        // 设置初始位置
+        soldier.style.left = '60px';
+        soldier.style.bottom = '60px';
+        
+        document.body.appendChild(soldier);
+        
+        let isDragging = false;
+        let currentX, currentY, initialX, initialY;
+        let pathIndex = -1;
+        let isWalking = false;
+        
+        // 获取所有路线元素
+        function getPathElements() {
+            return document.querySelectorAll('svg path.leaflet-interactive');
+        }
+        
+        // 检查点是否在路径上
+        function isPointOnPath(x, y, pathElement) {
+            // 获取SVG元素
+            const svgElement = pathElement.closest('svg');
+            if (!svgElement) return false;
+            
+            const svgRect = svgElement.getBoundingClientRect();
+            
+            // 检查点击位置是否在SVG矩形内
+            if (x < svgRect.left - 10 || x > svgRect.right + 10 || y < svgRect.top - 10 || y > svgRect.bottom + 10) {
+                return false;
+            }
+            
+            try {
+                // 获取SVG的CTM(Current Transformation Matrix)以将屏幕坐标转换为SVG坐标
+                const point = svgElement.createSVGPoint();
+                point.x = x;
+                point.y = y;
+                
+                // 获取SVG元素的坐标系中的点
+                const transformedPoint = point.matrixTransform(svgElement.getScreenCTM().inverse());
+                
+                // 使用isPointInStroke和isPointInFill来检测点是否在线上
+                const isInStroke = pathElement.isPointInStroke(transformedPoint);
+                const isInFill = pathElement.isPointInFill(transformedPoint);
+                
+                // 使用getPointAtLength进行更精确的检测
+                const pathLength = pathElement.getTotalLength();
+                
+                // 增加采样密度以提高检测精度
+                for (let i = 0; i <= pathLength; i += 1) {
+                    const pathPoint = pathElement.getPointAtLength(i);
+                    const distance = Math.sqrt(
+                        Math.pow(transformedPoint.x - pathPoint.x, 2) + 
+                        Math.pow(transformedPoint.y - pathPoint.y, 2)
+                    );
+                    
+                    // 扩大检测范围到20像素以提高成功率
+                    if (distance < 20) {
+                        return true;
+                    }
+                }
+                
+                return isInStroke || isInFill;
+            } catch (error) {
+                console.error('检测路径点出错:', error);
+                return false;
+            }
+        }
+        
+        // 找到小士兵所在的路径索引
+        function findPathIndex(x, y) {
+            const paths = getPathElements();
+            for (let i = 0; i < paths.length; i++) {
+                // 直接传递绝对坐标给isPointOnPath
+                if (isPointOnPath(x, y, paths[i])) {
+                    console.log('找到路径索引:', i);
+                    return i;
+                }
+            }
+            console.log('未找到路径');
+            return -1;
+        }
+        
+        // 找到点在路径上的最近位置，并返回进度值(0-1)
+        function findClosestPointOnPath(x, y, pathElement) {
+            const svgElement = pathElement.closest('svg');
+            if (!svgElement) return -1;
+            
+            try {
+                const point = svgElement.createSVGPoint();
+                point.x = x;
+                point.y = y;
+                
+                const transformedPoint = point.matrixTransform(svgElement.getScreenCTM().inverse());
+                const pathLength = pathElement.getTotalLength();
+                
+                let minDistance = Infinity;
+                let closestPointIndex = 0;
+            }
+            catch (error) {
+                console.error('查找最近点出错:', error);
+                return -1;
+            }
+        }
+        
+        // 拖拽开始
+        soldier.addEventListener('mousedown', function(e) {
+            initialX = e.clientX;
+            initialY = e.clientY;
+            
+            // 记录当前小士兵的位置
+            const rect = soldier.getBoundingClientRect();
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+            
+            isDragging = true;
+            soldier.classList.add('dragging');
+            isWalking = false;
+            soldier.classList.remove('walking');
+            
+            // 拖拽过程
+            function onMouseMove(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    currentX = e.clientX - offsetX;
+                    currentY = e.clientY - offsetY;
+                    
+                    // 确保小士兵不会移出视口
+                    const maxX = window.innerWidth - soldier.offsetWidth;
+                    const maxY = window.innerHeight - soldier.offsetHeight;
+                    
+                    currentX = Math.max(0, Math.min(currentX, maxX));
+                    currentY = Math.max(0, Math.min(currentY, maxY));
+                    
+                    // 更新位置
+                    soldier.style.left = currentX + 'px';
+                    soldier.style.top = currentY + 'px';
+                    
+                    // 检查小士兵是否在路径上
+                    const newPathIndex = findPathIndex(e.clientX, e.clientY);
+                    if (newPathIndex !== -1 && newPathIndex !== pathIndex) {
+                        pathIndex = newPathIndex;
+                    }
+                }
+            }
+            
+            // 拖拽结束
+            function onMouseUp() {
+                isDragging = false;
+                soldier.classList.remove('dragging');
+                
+                // 移除临时事件监听器
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+            
+            // 添加临时事件监听器
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+        
+        // 添加触摸设备支持
+        soldier.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                initialX = touch.clientX;
+                initialY = touch.clientY;
+                
+                const rect = soldier.getBoundingClientRect();
+                const offsetX = touch.clientX - rect.left;
+                const offsetY = touch.clientY - rect.top;
+                
+                isDragging = true;
+                soldier.classList.add('dragging');
+                isWalking = false;
+                soldier.classList.remove('walking');
+                
+                function onTouchMove(e) {
+                    if (isDragging && e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        currentX = touch.clientX - offsetX;
+                        currentY = touch.clientY - offsetY;
+                        
+                        const maxX = window.innerWidth - soldier.offsetWidth;
+                        const maxY = window.innerHeight - soldier.offsetHeight;
+                        
+                        currentX = Math.max(0, Math.min(currentX, maxX));
+                        currentY = Math.max(0, Math.min(currentY, maxY));
+                        
+                        soldier.style.left = currentX + 'px';
+                        soldier.style.top = currentY + 'px';
+                        
+                        const newPathIndex = findPathIndex(touch.clientX, touch.clientY);
+                        if (newPathIndex !== -1 && newPathIndex !== pathIndex) {
+                            pathIndex = newPathIndex;
+                        }
+                    }
+                }
+                
+                function onTouchEnd() {
+                    isDragging = false;
+                    soldier.classList.remove('dragging');
+                    
+                    document.removeEventListener('touchmove', onTouchMove);
+                    document.removeEventListener('touchend', onTouchEnd);
+                }
+                
+                document.addEventListener('touchmove', onTouchMove);
+                document.addEventListener('touchend', onTouchEnd);
+            }
+        });
+        
+        // 双击让小士兵开始/停止行走
+        soldier.addEventListener('dblclick', function() {
+            if (pathIndex !== -1) {
+                isWalking = !isWalking;
+                if (isWalking) {
+                    soldier.classList.add('walking');
+                    startWalkingAnimation();
+                } else {
+                    soldier.classList.remove('walking');
+                    stopWalkingAnimation();
+                }
+            }
+        });
+        
+        // 开始行走动画
+        let walkAnimationInterval;
+        function startWalkingAnimation() {
+            const paths = getPathElements();
+            if (pathIndex === -1 || pathIndex >= paths.length) return;
+            
+            const pathElement = paths[pathIndex];
+            const pathLength = pathElement.getTotalLength();
+            let currentPosition = 0;
+            let direction = 1; // 1向前，-1向后
+            
+            walkAnimationInterval = setInterval(function() {
+                // 更新位置
+                currentPosition += direction * 2;
+                
+                // 检查是否到达路径末端
+                if (currentPosition >= pathLength) {
+                    currentPosition = pathLength;
+                    direction = -1; // 反向
+                } else if (currentPosition <= 0) {
+                    currentPosition = 0;
+                    direction = 1; // 正向
+                }
+                
+                // 获取路径上的点
+                const point = pathElement.getPointAtLength(currentPosition);
+                
+                // 转换SVG坐标到屏幕坐标
+                const svgElement = pathElement.closest('svg');
+                const svgRect = svgElement.getBoundingClientRect();
+                const matrix = svgElement.getScreenCTM();
+                
+                // 计算小士兵的屏幕位置
+                const screenX = point.x * matrix.a + matrix.e - soldier.offsetWidth / 2;
+                const screenY = point.y * matrix.d + matrix.f - soldier.offsetHeight;
+                
+                // 更新小士兵位置
+                soldier.style.left = screenX + 'px';
+                soldier.style.top = screenY + 'px';
+                
+            }, 50);
+        }
+        
+        // 停止行走动画
+        function stopWalkingAnimation() {
+            if (walkAnimationInterval) {
+                clearInterval(walkAnimationInterval);
+                walkAnimationInterval = null;
+            }
+        }
+        
+        // 监听地图缩放和平移，更新小士兵位置
+        map.on('zoomend moveend', function() {
+            if (isWalking && pathIndex !== -1) {
+                stopWalkingAnimation();
+                startWalkingAnimation();
+            }
+        });
+    }
+    
+    // 添加进度面板和顶部横幅
+    function addProgressPanel() {
+        // 创建顶部横幅
+        const headerBanner = document.createElement('div');
+        headerBanner.id = 'header-banner';
+        headerBanner.innerHTML = '<h1>红军长征路线图</h1>';
+        document.body.appendChild(headerBanner);
+        
+        // 创建进度面板
+        const progressPanel = document.createElement('div');
+        progressPanel.id = 'progress-panel';
+        
+        progressPanel.innerHTML = `
+            <h3>长征进度</h3>
+            <div id="progress-info">
+                <div>已完成: <span id="progress-text">0%</span></div>
+                <div id="progress-bar">
+                    <div id="progress-fill"></div>
+                </div>
+                <div id="current-location">当前位置: 起点</div>
+            </div>
+            <button id="prev-btn" class="control-btn">上一站</button>
+            <button id="next-btn" class="control-btn">下一站</button>
+        `;
+        
+        document.body.appendChild(progressPanel);
+        
+        // 添加事件监听器
+        document.getElementById('prev-btn').addEventListener('click', function() {
+            prevLocation();
+        });
+        
+        document.getElementById('next-btn').addEventListener('click', function() {
+            nextLocation();
+        });
+        
+        // 创建详情面板
+        const detailsPanel = document.createElement('div');
+        detailsPanel.id = 'details-panel';
+        
+        document.body.appendChild(detailsPanel);
+        
+        // 创建关闭按钮
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close-btn';
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.addEventListener('click', function() {
+            detailsPanel.classList.remove('show');
+        });
+        
+        document.body.appendChild(closeBtn);
+    }
+    
+    // 更新进度条
+    let currentIndex = 0;
+    function updateProgress(index) {
+        currentIndex = index;
+        const progressText = document.getElementById('progress-text');
+        const progressFill = document.getElementById('progress-fill');
+        const currentLocation = document.getElementById('current-location');
+        
+        if (index === 0) {
+            progressText.textContent = '0%';
+            progressFill.style.width = '0%';
+            currentLocation.textContent = '当前位置: 起点';
+        } else {
+            const progress = Math.round((index / (longMarchWaypoints.length - 1)) * 100);
+            progressText.textContent = progress + '%';
+            progressFill.style.width = progress + '%';
+            currentLocation.textContent = '当前位置: ' + longMarchWaypoints[index - 1].name;
+        }
+        
+        // 平滑滚动到对应位置
+        if (index > 0) {
+            map.setView([longMarchWaypoints[index - 1].lat, longMarchWaypoints[index - 1].lng], 7);
+        } else {
+            map.setView([longMarchWaypoints[0].lat, longMarchWaypoints[0].lng], 4);
+        }
+    }
+    
+    // 上一站
+    function prevLocation() {
+        if (currentIndex > 0) {
+            updateProgress(currentIndex - 1);
+        }
+    }
+    
+    // 下一站
+    function nextLocation() {
+        if (currentIndex < longMarchWaypoints.length) {
+            updateProgress(currentIndex + 1);
+        }
+    }
+    
+    // 添加行走动画样式
+    function addWalkingAnimation() {
+        const style = document.createElement('style');
+        style.textContent = `
+            /* 路径动画样式 */
+            .path-animation {
+                stroke-dasharray: 10;
+                animation: dash 30s linear infinite;
+            }
+            
+            @keyframes dash {
+                to {
+                    stroke-dashoffset: -1000;
+                }
+            }
+            
+            /* 节点动画样式 */
+            .node-pulse {
+                animation: pulse 2s infinite;
+            }
+            
+            @keyframes pulse {
+                0% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+                50% {
+                    transform: scale(1.2);
+                    opacity: 0.7;
+                }
+                100% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // 为线段添加动画效果
+    function animatePaths() {
+        const paths = document.querySelectorAll('svg path.leaflet-interactive');
+        paths.forEach((path, index) => {
+            // 添加延迟以创建顺序动画效果
+            setTimeout(() => {
+                path.classList.add('path-animation');
+            }, index * 500);
+        });
+        
+        // 为标记添加脉冲动画
+        const markers = document.querySelectorAll('.leaflet-marker-icon');
+        markers.forEach((marker, index) => {
+            setTimeout(() => {
+                const iconElement = marker.querySelector('div');
+                if (iconElement) {
+                    iconElement.classList.add('node-pulse');
+                }
+            }, (index + 1) * 800);
+        });
+    }
+    
+    // 打开详情页
+    function openDetails() {
+        const detailsPanel = document.getElementById('details-panel');
+        detailsPanel.classList.add('show');
+    }
+    
+    // 长征节点详情数据
+    const longMarchDetails = [
+        {
+            name: "瑞金",
+            date: "1934年10月",
+            description: "红军从瑞金出发，开始了举世闻名的二万五千里长征。",
+            significance: "长征的起点，标志着红军战略转移的开始。",
+            history: "1934年10月10日，中共中央、中革军委率中央红军主力8.6万余人，从瑞金等地出发，开始长征。",
+            image: "https://example.com/ruijin.jpg"
+        },
+        {
+            name: "遵义会议会址",
+            date: "1935年1月",
+            description: "遵义会议确立了毛泽东在党中央和红军的领导地位。",
+            significance: "中国共产党历史上一个生死攸关的转折点，挽救了党、挽救了红军、挽救了中国革命。",
+            history: "1935年1月15日至17日，中共中央在遵义召开政治局扩大会议，确立了毛泽东在党中央和红军的领导地位。",
+            image: "https://example.com/zunyi.jpg"
+        },
+        {
+            name: "赤水河畔",
+            date: "1935年1-3月",
+            description: "四渡赤水战役是毛泽东军事指挥艺术的得意之作。",
+            significance: "打乱了国民党军队的追缴计划，取得了战略转移中具有决定意义的胜利。",
+            history: "1935年1月19日至3月22日，中央红军在毛泽东等指挥下，四渡赤水，巧妙穿插于国民党军重兵集团之间。",
+            image: "https://example.com/chishui.jpg"
+        },
+        {
+            name: "巧渡金沙江",
+            date: "1935年5月",
+            description: "红军不费一枪一弹，智取金沙江，摆脱了几十万国民党军的围追堵截。",
+            significance: "实现了渡江北上的战略意图，取得了战略转移中具有决定意义的胜利。",
+            history: "1935年5月3日至9日，红军主力在7条木船上，用7天7夜的时间，全部渡过金沙江。",
+            image: "https://example.com/jinsha.jpg"
+        },
+        {
+            name: "强渡大渡河",
+            date: "1935年5月",
+            description: "红军以无比的英勇精神强渡大渡河，飞夺泸定桥。",
+            significance: "打破了蒋介石妄图把红军变成第二个石达开的迷梦。",
+            history: "1935年5月25日，17名勇士强渡大渡河成功；5月29日，22名勇士飞夺泸定桥成功。",
+            image: "https://example.com/daduhe.jpg"
+        },
+        {
+            name: "翻雪山（夹金山）",
+            date: "1935年6月",
+            description: "红军克服了难以想象的困难，翻越了夹金山。",
+            significance: "展示了红军不怕牺牲、百折不挠的革命英雄主义精神。",
+            history: "1935年6月12日，红军先头部队翻越了长征途中的第一座大雪山——夹金山，海拔4000多米。",
+            image: "https://example.com/jiajinshan.jpg"
+        },
+        {
+            name: "过草地",
+            date: "1935年8月",
+            description: "红军过草地是长征中最艰苦的一段路程。",
+            significance: "红军以惊人的毅力，战胜了饥饿、寒冷、疾病和死亡的威胁。",
+            history: "1935年8月21日至26日，红军右路军经过5天的艰苦行军，走出了纵横数百里的水草地。",
+            image: "https://example.com/caodi.jpg"
+        },
+        {
+            name: "腊子口战役遗址",
+            date: "1935年9月",
+            description: "腊子口战役是红军长征中的一次重要战役。",
+            significance: "打开了红军北上进入甘肃的通道。",
+            history: "1935年9月16日，红军发起腊子口战役，经过激烈战斗，于17日晨攻克腊子口。",
+            image: "https://example.com/lazikou.jpg"
+        },
+        {
+            name: "哈达铺",
+            date: "1935年9月",
+            description: "哈达铺是红军长征中的'加油站'。",
+            significance: "红军在这里得到了宝贵的休整和补充，并确定了继续北上的战略方针。",
+            history: "1935年9月20日，红军到达哈达铺，在这里进行了休整，并通过报纸了解到陕北有红军根据地。",
+            image: "https://example.com/hadapu.jpg"
+        },
+        {
+            name: "榜罗镇会议会址",
+            date: "1935年9月",
+            description: "榜罗镇会议决定了红军长征的最终目的地。",
+            significance: "确定了把中共中央和陕甘支队的落脚点放在陕北的战略决策。",
+            history: "1935年9月27日，中共中央政治局在榜罗镇召开常委会议，决定把长征的落脚点放在陕北。",
+            image: "https://example.com/bangluozhen.jpg"
+        },
+        {
+            name: "吴起镇",
+            date: "1935年10月",
+            description: "中央红军到达吴起镇，标志着红一方面军长征的胜利结束。",
+            significance: "红一方面军长征胜利结束，为中国革命打开了新局面。",
+            history: "1935年10月19日，中共中央和红一方面军到达陕北吴起镇，与陕北红军会师。",
+            image: "https://example.com/wuqizhen.jpg"
+        }
+    ];
+    
+    // 打开节点详情
+    function openDetailsForNode(index) {
+        const detailsPanel = document.getElementById('details-panel');
+        const detail = longMarchDetails[index];
+        
+        detailsPanel.innerHTML = `
+            <h2>${detail.name}</h2>
+            <h3>${detail.date}</h3>
+            
+            <div class="detail-section">
+                <h4>简介</h4>
+                <p>${detail.description}</p>
+            </div>
+            
+            <div class="detail-section">
+                <h4>历史意义</h4>
+                <p>${detail.significance}</p>
+            </div>
+            
+            <div class="detail-section">
+                <h4>历史背景</h4>
+                <p>${detail.history}</p>
+            </div>
+            
+            <div class="detail-section">
+                <img src="${detail.image}" alt="${detail.name}" style="width: 100%; height: auto; border-radius: 4px;">
+            </div>
+        `;
+        
+        detailsPanel.classList.add('show');
+    }
+    
+    // 添加图层控制器
+    L.control.layers({
+        'OpenStreetMap': tileLayer,
+        '卫星图': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        })
+    }).addTo(map);
+    
+    // 添加比例尺
+    L.control.scale().addTo(map);
+    
+    // 添加地图图例
+    var legend = L.control({
+        position: 'bottomright'
+    });
+    
+    legend.onAdd = function(map) {
+        var div = L.DomUtil.create('div', 'legend');
+        div.innerHTML = `
+            <h4>图例</h4>
+            <i style="background: #FFB6C1; width: 20px; height: 3px;"></i> 红军长征路线<br>
+            <i style="background: #d32f2f; border-radius: 50%; width: 20px; height: 20px;"></i> 长征节点<br>      
+        `;
+        return div;
+    };
+    
+    legend.addTo(map);
+    
+    // 初始化添加进度面板
+    addProgressPanel();
+</script>
 </body>
 </html>
