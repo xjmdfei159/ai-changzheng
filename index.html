@@ -1534,6 +1534,650 @@
     
     legend.addTo(map);
     
+    // 添加行走动画样式
+    addWalkingAnimation();
+    
+    // 为线段添加动画效果
+    setTimeout(animatePaths, 2000);
+    
+    // 添加可拖拽的小士兵
+    addSoldier();
+    
+    // 初始化进度
+    updateProgress(0);
+    
+    // 为地图上的标记添加点击事件
+    // 注意：这部分需要在地图完全加载后执行
+    setTimeout(function() {
+        const markers = document.querySelectorAll('.leaflet-marker-icon');
+        markers.forEach((marker, index) => {
+            marker.addEventListener('click', function(e) {
+                // 阻止事件冒泡，避免循环调用
+                e.stopPropagation();
+                updateProgress(index);
+                // 调用openDetails函数打开详情页
+                openDetails();
+                // 确保浮窗能正确弹出
+                if (marker._icon && marker._icon.parentNode && marker._icon.parentNode._popup) {
+                    marker._icon.parentNode.openPopup();
+                }
+            });
+        });
+    }, 1000);
+    
+    // 添加CSS样式使详情面板可见
+    setTimeout(function() {
+        const style = document.createElement('style');
+        style.textContent = `
+            #details-panel.show {
+                right: 0;
+            }
+            
+            /* 红军小人样式 */
+            #soldier {
+                position: absolute;
+                width: 40px;
+                height: 60px;
+                cursor: move;
+                z-index: 999;
+                transform-origin: center bottom;
+                pointer-events: all;
+            }
+            
+            #soldier.dragging {
+                opacity: 0.8;
+                transform: scale(1.1);
+            }
+            
+            /* 红军小人行走动画 */
+            @keyframes walk {
+                0%, 100% {
+                    transform: translateY(0) rotate(0deg);
+                }
+                25% {
+                    transform: translateY(-5px) rotate(-3deg);
+                }
+                50% {
+                    transform: translateY(0) rotate(3deg);
+                }
+                75% {
+                    transform: translateY(-5px) rotate(-2deg);
+                }
+            }
+            
+            #soldier.walking {
+                animation: walk 0.6s infinite ease-in-out;
+            }
+            
+            /* 红军小人组件 */
+            .soldier-body {
+                position: relative;
+                width: 40px;
+                height: 60px;
+            }
+            
+            .soldier-head {
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 24px;
+                height: 24px;
+                background-color: #f5d0c5;
+                border-radius: 50%;
+                border: 2px solid #000;
+            }
+            
+            .soldier-uniform {
+                position: absolute;
+                top: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 30px;
+                height: 20px;
+                background-color: #d32f2f;
+                border: 2px solid #000;
+            }
+            
+            .soldier-legs {
+                position: absolute;
+                top: 44px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 20px;
+                height: 16px;
+                display: flex;
+                justify-content: space-between;
+            }
+            
+            .soldier-left-leg,
+            .soldier-right-leg {
+                width: 6px;
+                height: 16px;
+                background-color: #212121;
+                border: 1px solid #000;
+                position: relative;
+            }
+            
+            .soldier-arms {
+                position: absolute;
+                top: 28px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 40px;
+                height: 8px;
+                display: flex;
+                justify-content: space-between;
+            }
+            
+            .soldier-left-arm,
+            .soldier-right-arm {
+                width: 12px;
+                height: 8px;
+                background-color: #d32f2f;
+                border: 1px solid #000;
+            }
+            
+            /* 行走时的手脚动画 */
+            #soldier.walking .soldier-left-leg {
+                animation: leg-move 0.6s infinite ease-in-out;
+            }
+            
+            #soldier.walking .soldier-right-leg {
+                animation: leg-move 0.6s infinite ease-in-out 0.3s;
+            }
+            
+            #soldier.walking .soldier-left-arm {
+                animation: arm-move 0.6s infinite ease-in-out 0.3s;
+            }
+            
+            #soldier.walking .soldier-right-arm {
+                animation: arm-move 0.6s infinite ease-in-out;
+            }
+            
+            @keyframes leg-move {
+                0%, 100% {
+                    transform: rotate(0deg);
+                }
+                50% {
+                    transform: rotate(-20deg);
+                }
+            }
+            
+            @keyframes arm-move {
+                0%, 100% {
+                    transform: rotate(0deg);
+                }
+                50% {
+                    transform: rotate(20deg);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }, 500);
+    
+    // 添加可拖拽的小人
+    function addSoldier() {
+        const soldier = document.createElement('div');
+        soldier.id = 'soldier';
+        
+        // 创建带有手和脚的小人HTML结构
+        soldier.innerHTML = `
+            <div class="soldier-body">
+                <div class="soldier-head"></div>
+                <div class="soldier-uniform"></div>
+                <div class="soldier-arms">
+                    <div class="soldier-left-arm"></div>
+                    <div class="soldier-right-arm"></div>
+                </div>
+                <div class="soldier-legs">
+                    <div class="soldier-left-leg"></div>
+                    <div class="soldier-right-leg"></div>
+                </div>
+            </div>
+        `;
+        
+        // 设置初始位置
+        soldier.style.left = '60px';
+        soldier.style.bottom = '60px';
+        
+        document.body.appendChild(soldier);
+        
+        let isDragging = false;
+        let currentX, currentY, initialX, initialY;
+        let pathIndex = -1;
+        let isWalking = false;
+        let startTime = null;
+        let currentProgress = 0;
+        let duration = 20000;
+        
+        // 获取所有路线元素
+        function getPathElements() {
+            return document.querySelectorAll('svg path.leaflet-interactive');
+        }
+        
+        // 检查点是否在路径上
+        function isPointOnPath(x, y, pathElement) {
+            // 获取SVG元素
+            const svgElement = pathElement.closest('svg');
+            if (!svgElement) return false;
+            
+            const svgRect = svgElement.getBoundingClientRect();
+            
+            // 检查点击位置是否在SVG矩形内
+            if (x < svgRect.left - 10 || x > svgRect.right + 10 || y < svgRect.top - 10 || y > svgRect.bottom + 10) {
+                return false;
+            }
+            
+            try {
+                // 获取SVG的CTM(Current Transformation Matrix)以将屏幕坐标转换为SVG坐标
+                const point = svgElement.createSVGPoint();
+                point.x = x;
+                point.y = y;
+                
+                // 获取SVG元素的坐标系中的点
+                const transformedPoint = point.matrixTransform(svgElement.getScreenCTM().inverse());
+                
+                // 使用isPointInStroke和isPointInFill来检测点是否在线上
+                const isInStroke = pathElement.isPointInStroke(transformedPoint);
+                const isInFill = pathElement.isPointInFill(transformedPoint);
+                
+                // 使用getPointAtLength进行更精确的检测
+                const pathLength = pathElement.getTotalLength();
+                
+                // 增加采样密度以提高检测精度
+                for (let i = 0; i <= pathLength; i += 1) {
+                    const pathPoint = pathElement.getPointAtLength(i);
+                    const distance = Math.sqrt(
+                        Math.pow(transformedPoint.x - pathPoint.x, 2) + 
+                        Math.pow(transformedPoint.y - pathPoint.y, 2)
+                    );
+                    
+                    // 扩大检测范围到20像素以提高成功率
+                    if (distance < 20) {
+                        return true;
+                    }
+                }
+                
+                return isInStroke || isInFill;
+            } catch (error) {
+                console.error('检测路径点出错:', error);
+                return false;
+            }
+        }
+        
+        // 找到小士兵所在的路径索引
+        function findPathIndex(x, y) {
+            const paths = getPathElements();
+            for (let i = 0; i < paths.length; i++) {
+                // 直接传递绝对坐标给isPointOnPath
+                if (isPointOnPath(x, y, paths[i])) {
+                    console.log('找到路径索引:', i);
+                    return i;
+                }
+            }
+            console.log('未找到路径');
+            return -1;
+        }
+        
+        // 找到点在路径上的最近位置，并返回进度值(0-1)
+        function findClosestPointOnPath(x, y, pathElement) {
+            const svgElement = pathElement.closest('svg');
+            if (!svgElement) return -1;
+            
+            try {
+                const point = svgElement.createSVGPoint();
+                point.x = x;
+                point.y = y;
+                
+                const transformedPoint = point.matrixTransform(svgElement.getScreenCTM().inverse());
+                const pathLength = pathElement.getTotalLength();
+                
+                let minDistance = Infinity;
+                let closestPointIndex = 0;
+                
+                // 在路径上采样更多点以找到最近点
+                for (let i = 0; i <= pathLength; i += 5) {
+                    const pathPoint = pathElement.getPointAtLength(i);
+                    const distance = Math.sqrt(
+                        Math.pow(transformedPoint.x - pathPoint.x, 2) + 
+                        Math.pow(transformedPoint.y - pathPoint.y, 2)
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPointIndex = i;
+                    }
+                }
+                
+                // 只有当最近点足够近时才返回进度值
+                if (minDistance < 30) {
+                    return closestPointIndex / pathLength;
+                }
+                
+                return -1;
+            } catch (error) {
+                console.error('计算路径最近点出错:', error);
+                return -1;
+            }
+        }
+        
+        // 沿路径移动小人
+        function moveAlongPath(pathIndex, duration = 20000, startPosition = null) { // 减慢速度为20秒
+            const paths = getPathElements();
+            if (pathIndex < 0 || pathIndex >= paths.length) return;
+            
+            // 开始行走动画
+            isWalking = true;
+            soldier.classList.add('walking');
+            
+            const path = paths[pathIndex];
+            const pathLength = path.getTotalLength();
+            let startTime = null;
+            let currentProgress = 0; // 保存当前行走进度
+            
+            // 如果提供了起始位置（拖拽释放的位置），计算在路径上的进度
+            if (startPosition) {
+                const progress = findClosestPointOnPath(startPosition.x, startPosition.y, path);
+                if (progress >= 0) {
+                    currentProgress = progress;
+                    console.log('从拖拽位置开始移动，进度:', currentProgress);
+                }
+            }
+            
+            function move(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = currentProgress + (timestamp - startTime) / duration;
+                
+                if (progress < 1 && isWalking) {
+                    const point = path.getPointAtLength(progress * pathLength);
+                    
+                    // 获取地图容器位置
+                    const mapContainer = document.querySelector('.map-container, .folium-map') || document.querySelector('.folium-map');
+                    if (!mapContainer) {
+                        console.error('地图容器未找到');
+                        return;
+                    }
+                    
+                    const mapRect = mapContainer.getBoundingClientRect();
+                    const svgElement = path.closest('svg');
+                    
+                    if (svgElement) {
+                        const svgRect = svgElement.getBoundingClientRect();
+                        
+                        // 修复计算逻辑，确保小人准确沿着路线行走
+                        const mapX = point.x + svgRect.left - mapRect.left - 20; // 减去小人宽度的一半使其居中
+                        const mapY = point.y + svgRect.top - mapRect.top - 28; // 调整垂直位置，确保脚踩在线上
+                        
+                        // 确保位置在合理范围内，防止小人消失
+                        const containerWidth = mapContainer.offsetWidth;
+                        const containerHeight = mapContainer.offsetHeight;
+                        const soldierWidth = 40;
+                        const soldierHeight = 60;
+                        
+                        // 限制小人在地图容器内
+                        const safeX = Math.max(0, Math.min(mapX, containerWidth - soldierWidth));
+                        const safeY = Math.max(0, Math.min(mapY, containerHeight - soldierHeight));
+                        
+                        // 设置小人位置（相对于地图容器）
+                        soldier.style.position = 'absolute';
+                        soldier.style.left = safeX + 'px';
+                        soldier.style.top = safeY + 'px';
+                        soldier.style.bottom = 'auto';
+                        
+                        // 确保小人始终显示在地图上方
+                        soldier.style.zIndex = '999';
+                        
+                        // 确保小人元素是可见的
+                        soldier.style.display = 'block';
+                    }
+                    
+                    // 确保动画持续进行
+                    if (typeof window.requestAnimationFrame === 'function') {
+                        requestAnimationFrame(move);
+                    } else {
+                        // 降级方案 - 使用setTimeout作为后备
+                        setTimeout(() => move(Date.now()), 16); // 约60fps
+                    }
+                } else {
+                    // 移动结束
+                    isWalking = false;
+                    soldier.classList.remove('walking');
+                    
+                    // 移动到下一站
+                    currentNodeIndex = Math.min(currentNodeIndex + 1, totalNodes - 1);
+                    updateProgress(currentNodeIndex);
+                    
+                    // 检查是否到达终点
+                    if (currentNodeIndex >= totalNodes - 1) {
+                        // 延迟3秒后返回界面左下方
+                        setTimeout(() => {
+                            // 重置位置到界面左下方
+                            resetSoldierPosition();
+                        }, 3000);
+                    }
+                }
+            }
+            
+            // 确保动画开始，并重置startTime确保从路径起点开始
+            startTime = null;
+            if (typeof window.requestAnimationFrame === 'function') {
+                requestAnimationFrame(move);
+            } else {
+                // 降级方案
+                move(Date.now());
+            }
+            console.log('开始沿路径移动小人，路径索引:', pathIndex);
+        }
+        
+        // 重置小人到界面左下方
+        function resetSoldierPosition() {
+            // 确保地图容器存在
+            const mapContainer = document.querySelector('.map-container, .folium-map') || document.querySelector('.folium-map');
+            if (!mapContainer) {
+                console.error('地图容器未找到');
+                return;
+            }
+            
+            // 停止任何行走动画
+            isWalking = false;
+            soldier.classList.remove('walking');
+            
+            // 重置到界面左下方，使用相对定位以避免受到地图缩放影响
+            soldier.style.position = 'absolute';
+            soldier.style.left = '60px';
+            soldier.style.bottom = '60px';
+            soldier.style.top = 'auto';
+            
+            // 确保小人可见
+            soldier.style.zIndex = '999';
+            soldier.style.display = 'block';
+            
+            // 重置路径索引
+            pathIndex = -1;
+            
+            console.log('小人已重置到界面左下方');
+        }
+            
+        // 鼠标按下事件
+        soldier.addEventListener('mousedown', function(e) {
+            // 停止行走动画
+            if (isWalking) {
+                isWalking = false;
+                soldier.classList.remove('walking');
+            }
+            
+            initialX = e.clientX;
+            initialY = e.clientY;
+            isDragging = true;
+            soldier.classList.add('dragging');
+            
+            // 改变为固定定位以便拖拽
+            soldier.style.position = 'fixed';
+        });
+            
+        // 鼠标移动事件
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+                e.preventDefault();
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                initialX = e.clientX;
+                initialY = e.clientY;
+                
+                const newLeft = parseInt(soldier.style.left || '60px') + currentX;
+                const newBottom = parseInt(soldier.style.bottom || '60px') - currentY;
+                
+                // 限制在视口内
+                if (newLeft > 0 && newLeft < window.innerWidth - 40) {
+                    soldier.style.left = newLeft + 'px';
+                }
+                if (newBottom > 0 && newBottom < window.innerHeight - 40) {
+                    soldier.style.bottom = newBottom + 'px';
+                }
+            }
+        });
+            
+        // 鼠标释放事件
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                soldier.classList.remove('dragging');
+                
+                // 获取小人中心点坐标
+                const rect = soldier.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + rect.height / 2;
+                
+                // 寻找所有路径中最近的点，无论是否在路径上
+                let closestPathIndex = -1;
+                let closestProgress = -1;
+                let minDistance = Infinity;
+                const paths = getPathElements();
+                
+                // 遍历所有路径找到最近的点
+                for (let i = 0; i < paths.length; i++) {
+                    const path = paths[i];
+                    const svgElement = path.closest('svg');
+                    if (!svgElement) continue;
+                    
+                    try {
+                        const point = svgElement.createSVGPoint();
+                        point.x = x;
+                        point.y = y;
+                        
+                        const transformedPoint = point.matrixTransform(svgElement.getScreenCTM().inverse());
+                        const pathLength = path.getTotalLength();
+                        let pathMinDistance = Infinity;
+                        let closestPointIndex = 0;
+                        
+                        // 在路径上采样更多点以找到最近点
+                        for (let j = 0; j <= pathLength; j += 2) { // 增加采样密度
+                            const pathPoint = path.getPointAtLength(j);
+                            const distance = Math.sqrt(
+                                Math.pow(transformedPoint.x - pathPoint.x, 2) + 
+                                Math.pow(transformedPoint.y - pathPoint.y, 2)
+                            );
+                            
+                            if (distance < pathMinDistance) {
+                                pathMinDistance = distance;
+                                closestPointIndex = j;
+                            }
+                        }
+                        
+                        // 找到此路径上的最近点
+                        if (pathMinDistance < minDistance) {
+                            minDistance = pathMinDistance;
+                            closestPathIndex = i;
+                            closestProgress = closestPointIndex / pathLength;
+                        }
+                    } catch (error) {
+                        console.error('计算路径最近点出错:', error);
+                    }
+                }
+                
+                // 如果找到足够近的路径（距离阈值设为60像素）
+                if (closestPathIndex !== -1 && minDistance < 60) {
+                    pathIndex = closestPathIndex;
+                    
+                    // 获取对应的路径元素
+                    const path = paths[pathIndex];
+                    
+                    // 将小人位置转换为相对于地图容器的坐标
+                    const mapContainer = document.querySelector('.map-container, .folium-map') || document.querySelector('.folium-map');
+                    if (mapContainer) {
+                        const mapRect = mapContainer.getBoundingClientRect();
+                        const svgElement = path.closest('svg');
+                        
+                        if (svgElement) {
+                            const svgRect = svgElement.getBoundingClientRect();
+                            
+                            // 立即将小人定位到路径上的精确位置
+                            const point = path.getPointAtLength(closestProgress * path.getTotalLength());
+                            const mapX = point.x + svgRect.left - mapRect.left - 20;
+                            const mapY = point.y + svgRect.top - mapRect.top - 28;
+                            
+                            // 设置位置
+                            soldier.style.position = 'absolute';
+                            soldier.style.left = mapX + 'px';
+                            soldier.style.top = mapY + 'px';
+                            soldier.style.bottom = 'auto';
+                            soldier.style.zIndex = '999';
+                            soldier.style.display = 'block';
+                            
+                            // 从该位置开始沿路径移动
+                            moveAlongPath(pathIndex, 20000, {x: mapX + 20, y: mapY + 28});
+                        }
+                    }
+                } else {
+                    // 如果不在任何路线附近，确保小人不会消失
+                    soldier.style.display = 'block';
+                    soldier.style.zIndex = '999';
+                }
+            }
+        });
+            
+        // 监听地图拖动事件，确保小人在行走时不受影响
+        const map = getMap();
+        if (map) {
+            map.on('dragstart', function() {
+                if (isWalking) {
+                    // 保存当前位置
+                    const rect = soldier.getBoundingClientRect();
+                    const mapContainer = document.querySelector('.map-container, .folium-map');
+                    const mapRect = mapContainer.getBoundingClientRect();
+                    
+                    // 保存当前进度
+                    if (startTime) {
+                        const elapsedTime = Date.now() - startTime;
+                        currentProgress = Math.min(elapsedTime / duration, 1);
+                    }
+                    
+                    // 转换为相对于地图的位置
+                    soldier.style.position = 'absolute';
+                    soldier.style.left = (rect.left - mapRect.left) + 'px';
+                    soldier.style.top = (rect.top - mapRect.top) + 'px';
+                    soldier.style.bottom = 'auto';
+                }
+            });
+            
+            map.on('dragend', function() {
+                if (isWalking) {
+                    // 继续行走动画，从保存的进度继续
+                    if (pathIndex !== -1) {
+                        // 重置startTime但保留进度
+                        startTime = null;
+                        if (typeof window.requestAnimationFrame === 'function') {
+                            requestAnimationFrame(move);
+                        } else {
+                            move(Date.now());
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
     // 初始化添加进度面板
     addProgressPanel();
 </script>
