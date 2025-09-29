@@ -1033,6 +1033,25 @@
                 
                 let minDistance = Infinity;
                 let closestPointIndex = 0;
+                
+                // 为了提高性能，可以减少采样密度，但仍然保持足够的精度
+                const samplingStep = Math.max(1, Math.floor(pathLength / 200));
+                
+                for (let i = 0; i <= pathLength; i += samplingStep) {
+                    const pathPoint = pathElement.getPointAtLength(i);
+                    const distance = Math.sqrt(
+                        Math.pow(transformedPoint.x - pathPoint.x, 2) + 
+                        Math.pow(transformedPoint.y - pathPoint.y, 2)
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPointIndex = i;
+                    }
+                }
+                
+                // 计算进度值(0-1)
+                return closestPointIndex / pathLength;
             }
             catch (error) {
                 console.error('查找最近点出错:', error);
@@ -1054,6 +1073,12 @@
             soldier.classList.add('dragging');
             isWalking = false;
             soldier.classList.remove('walking');
+            
+            // 清除行走动画
+            if (window.walkAnimationInterval) {
+                clearInterval(window.walkAnimationInterval);
+                window.walkAnimationInterval = null;
+            }
             
             // 拖拽过程
             function onMouseMove(e) {
@@ -1112,6 +1137,12 @@
                 isWalking = false;
                 soldier.classList.remove('walking');
                 
+                // 清除行走动画
+                if (window.walkAnimationInterval) {
+                    clearInterval(window.walkAnimationInterval);
+                    window.walkAnimationInterval = null;
+                }
+                
                 function onTouchMove(e) {
                     if (isDragging && e.touches.length === 1) {
                         const touch = e.touches[0];
@@ -1162,7 +1193,6 @@
         });
         
         // 开始行走动画
-        let walkAnimationInterval;
         function startWalkingAnimation() {
             const paths = getPathElements();
             if (pathIndex === -1 || pathIndex >= paths.length) return;
@@ -1172,7 +1202,12 @@
             let currentPosition = 0;
             let direction = 1; // 1向前，-1向后
             
-            walkAnimationInterval = setInterval(function() {
+            // 使用全局变量存储interval，确保只有一个实例运行
+            if (window.walkAnimationInterval) {
+                clearInterval(window.walkAnimationInterval);
+            }
+            
+            window.walkAnimationInterval = setInterval(function() {
                 // 更新位置
                 currentPosition += direction * 2;
                 
@@ -1186,39 +1221,46 @@
                 }
                 
                 // 获取路径上的点
-                const point = pathElement.getPointAtLength(currentPosition);
-                
-                // 转换SVG坐标到屏幕坐标
-                const svgElement = pathElement.closest('svg');
-                const svgRect = svgElement.getBoundingClientRect();
-                const matrix = svgElement.getScreenCTM();
-                
-                // 计算小士兵的屏幕位置
-                const screenX = point.x * matrix.a + matrix.e - soldier.offsetWidth / 2;
-                const screenY = point.y * matrix.d + matrix.f - soldier.offsetHeight;
-                
-                // 更新小士兵位置
-                soldier.style.left = screenX + 'px';
-                soldier.style.top = screenY + 'px';
-                
+                try {
+                    const point = pathElement.getPointAtLength(currentPosition);
+                    
+                    // 转换SVG坐标到屏幕坐标
+                    const svgElement = pathElement.closest('svg');
+                    const matrix = svgElement.getScreenCTM();
+                    
+                    if (matrix) {
+                        // 计算小士兵的屏幕位置
+                        const screenX = point.x * matrix.a + matrix.e - soldier.offsetWidth / 2;
+                        const screenY = point.y * matrix.d + matrix.f - soldier.offsetHeight;
+                        
+                        // 更新小士兵位置
+                        soldier.style.left = screenX + 'px';
+                        soldier.style.top = screenY + 'px';
+                    }
+                } catch (error) {
+                    console.error('更新小士兵位置出错:', error);
+                    stopWalkingAnimation();
+                }
             }, 50);
         }
         
         // 停止行走动画
         function stopWalkingAnimation() {
-            if (walkAnimationInterval) {
-                clearInterval(walkAnimationInterval);
-                walkAnimationInterval = null;
+            if (window.walkAnimationInterval) {
+                clearInterval(window.walkAnimationInterval);
+                window.walkAnimationInterval = null;
             }
         }
         
         // 监听地图缩放和平移，更新小士兵位置
-        map.on('zoomend moveend', function() {
-            if (isWalking && pathIndex !== -1) {
-                stopWalkingAnimation();
-                startWalkingAnimation();
-            }
-        });
+        if (map) {
+            map.on('zoomend moveend', function() {
+                if (isWalking && pathIndex !== -1) {
+                    stopWalkingAnimation();
+                    startWalkingAnimation();
+                }
+            });
+        }
     }
     
     // 添加进度面板和顶部横幅
